@@ -1,0 +1,81 @@
+import matplotlib.pyplot as plt
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.tree import export_text
+import numpy as np
+from sklearn.tree import export_text
+from sklearn.tree import export_graphviz
+import pydotplus
+from sklearn import tree
+from sklearn.tree import DecisionTreeClassifier
+import matplotlib.pyplot as plt
+from sklearn.feature_extraction.text import CountVectorizer
+from IPython.display import Image
+
+def load_data():
+    full = []
+    real = []
+    with open('real.txt', 'r') as f:
+        for line in f:
+            line = line.strip()
+            real.append(line)
+            full.append(line)
+    y = [1] * len(real)
+    
+    fake = []
+    with open('fake.txt', 'r') as f:
+        for line in f:
+            line = line.strip()
+            fake.append(line)
+            full.append(line)
+    y += [0] * len(fake)
+
+    vectorizer = CountVectorizer(stop_words='english')
+    X = vectorizer.fit_transform(full)
+    
+    train_datax, val_test_datax, train_datay, val_test_datay = train_test_split(X, y, test_size=0.30, random_state=42)
+    val_datax, test_datax, val_datay, test_datay = train_test_split(val_test_datax, val_test_datay, test_size=0.5, random_state=42)
+    
+    return train_datax, train_datay, val_datax, val_datay, test_datax, test_datay, vectorizer
+
+def select_model():
+    depths = [2, 4, 10, 20, 50, 60, 75, 90, 100, 500, 1000]
+    scorearray = []
+    best_depth = 0
+    for depth in depths:
+        model = DecisionTreeClassifier(max_depth=depth)
+        model.fit(train_datax, train_datay)
+        pred = model.predict(val_datax)
+        score = 0
+        for i in range(len(val_datay)):
+            if val_datay[i] == pred[i]:
+                score = score + 1
+        scorearray.append(score/len(val_datay))
+        if score/len(val_datay) > best_depth:
+            best_depth =score/len(val_datay)
+        print(f"Accuracy at depth {depth}: {score/len(val_datay)}")
+
+    plt.plot(depths, scorearray, marker='o', color = 'purple')
+    plt.title('Accuracy vs. max_depth')
+    plt.xlabel('max_depth')
+    plt.ylabel('Accuracy')
+    plt.grid(True)
+    plt.show()
+    return
+train_datax, train_datay, val_datax, val_datay, test_datax, test_datay, vectorizer = load_data()
+select_model()
+
+# Train Decision Tree Classifier with the best max_depth
+best_depth = depths[np.argmax(scorearray)]
+best_model = DecisionTreeClassifier(max_depth=best_depth)
+best_model.fit(test_datax, test_datay)
+
+# Extract and print the first two layers of the decision tree
+dot_data = export_graphviz(best_model, out_file=None,feature_names=vectorizer.get_feature_names_out(),filled=True, max_depth=2)
+tree_text = export_text(best_model, feature_names=vectorizer.get_feature_names_out(), max_depth=2)
+print(tree_text)
+print(dot_data)
+graph = pydotplus.graph_from_dot_data(dot_data)
+# DUE TO  display(Image(graph.create_png())) no working I Submitted our DOT_Data to GitHub https://dreampuf.github.io/GraphvizOnline/ to get a formal print out

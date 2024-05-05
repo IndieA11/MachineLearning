@@ -1,0 +1,97 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from tensorflow.keras.utils import to_categorical
+
+(train_images, train_labels), (test_images, test_labels) = mnist.load_data()
+
+# Preprocess the data
+train_images = train_images.reshape((train_images.shape[0], 28, 28, 1)).astype('float32') / 255
+test_images = test_images.reshape((test_images.shape[0], 28, 28, 1)).astype('float32') / 255
+train_labels = to_categorical(train_labels)
+test_labels = to_categorical(test_labels)
+
+# Define the CNN model
+model = Sequential()
+
+# First Convolutional Layer
+model.add(Conv2D(8, (3, 3), activation='relu', padding='same', input_shape=(28, 28, 1)))
+# Output: 28x28x8
+
+# First Pooling Layer
+model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+# Output: 14x14x8
+
+# Second Convolutional Layer
+model.add(Conv2D(16, (3, 3), activation='relu', padding='same'))
+# Output: 14x14x16
+
+# Second Pooling Layer
+model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+# Output: 7x7x16
+
+# Flatten Layer
+model.add(Flatten())
+# Output: 784
+
+# Output Layer
+model.add(Dense(10, activation='softmax'))
+# 784 x 10 + 10 = 7850
+
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+history = model.fit(train_images, train_labels, epochs=5, batch_size=128, validation_data=(test_images, test_labels))
+train_loss, train_acc = model.evaluate(train_images, train_labels, verbose=0)
+test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=0)
+print('Accuracy on Training Set:', train_acc)
+print('Accuracy on Test Set:', test_acc)
+
+# Generate confusion matrix
+test_predictions = np.argmax(model.predict(test_images), axis=1)
+conf_matrix = confusion_matrix(np.argmax(test_labels, axis=1), test_predictions)
+print('Confusion Matrix:')
+print(conf_matrix)
+
+# Apply PCA to the entire test feature vectors and represent the test data mapped by the two top principal components
+pca = PCA(n_components=2)
+flattened_test_images = test_images.reshape(test_images.shape[0], -1)
+pca.fit(flattened_test_images)
+test_mapped_features = pca.transform(flattened_test_images)
+
+plt.figure(figsize=(10, 10))
+for i in range(10):
+    indices = np.where(test_labels[:, i] == 1)
+    plt.scatter(test_mapped_features[indices, 0], test_mapped_features[indices, 1], label=str(i))
+
+plt.title('Mapped Features with 2 Principal Components')
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
+plt.legend()
+plt.show()
+
+# Repeat the previous step with 10 principal components for entire training and test sets
+pca_10 = PCA(n_components=10)
+pca_10.fit(flattened_test_images)
+test_mapped_features_10 = pca_10.transform(flattened_test_images)
+
+# Employ KNN with K=5 and Euclidean distance
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(test_mapped_features_10, np.argmax(test_labels, axis=1))
+test_predictions_knn = knn.predict(test_mapped_features_10)
+
+# Calculate test accuracy
+test_accuracy_knn = accuracy_score(np.argmax(test_labels, axis=1), test_predictions_knn)
+print('Test Accuracy with KNN (10 Principal Components):', test_accuracy_knn)
+
+# Generate confusion matrix for KNN
+conf_matrix_knn = confusion_matrix(np.argmax(test_labels, axis=1), test_predictions_knn)
+print('Confusion Matrix with KNN (10 Principal Components):')
+print(conf_matrix_knn)
+print(model.summary())
